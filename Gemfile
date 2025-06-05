@@ -24,7 +24,7 @@ gem "solid_cable"
 #auth
 gem "jwt"
 gem "bcrypt"
-
+g
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false
 
