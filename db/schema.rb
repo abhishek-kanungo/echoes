@@ -10,8 +10,26 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 0) do
+ActiveRecord::Schema[8.0].define(version: 2025_06_17_165906) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
+  create_table "users", force: :cascade do |t|
+    t.string "email"
+    t.string "name"
+    t.string "password_digest"
+    t.string "birth_location"
+    t.string "string"
+    t.string "current_location"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "google_uid"
+    t.boolean "email_verified"
+    t.string "avatar_url"
+    t.string "locale"
+    t.date "birthday"
+    t.string "gender"
+    t.index ["email"], name: "index_users_on_email"
+    t.index ["google_uid"], name: "index_users_on_google_uid", unique: true
+  end
 end

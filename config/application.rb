@@ -40,5 +40,23 @@ module Echoes
     # Middleware like session, flash, cookies can be added back manually.
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
+    
+    # Enable cookies and session for OmniAuth in API mode
+    config.middleware.use ActionDispatch::Cookies
+    config.middleware.use ActionDispatch::Session::CookieStore, key: '_echoes_session'
+    config.middleware.use OmniAuth::Builder do
+      provider :google_oauth2,
+        Rails.application.credentials.google_oauth[:client_id],
+        Rails.application.credentials.google_oauth[:client_secret],
+        {
+          redirect_uri: "http://localhost:3001/auth/google_oauth2/callback",
+          provider_ignores_state: true,  
+          scope: 'openid email profile https://www.googleapis.com/auth/user.birthday.read https://www.googleapis.com/auth/user.gender.read',
+          prompt: 'consent',
+          access_type: 'offline'        }
+    end
+    OmniAuth.config.allowed_request_methods = [:get]
+    OmniAuth.config.silence_get_warning = true
+        
   end
 end
