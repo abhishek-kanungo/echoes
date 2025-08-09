@@ -10,6 +10,20 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: pg_trgm; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pg_trgm; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION pg_trgm IS 'text similarity measurement and index searching based on trigrams';
+
+
+--
 -- Name: postgis; Type: EXTENSION; Schema: -; Owner: -
 --
 
@@ -37,6 +51,39 @@ CREATE TABLE public.ar_internal_metadata (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
+
+
+--
+-- Name: event_locations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.event_locations (
+    id bigint NOT NULL,
+    event_id bigint NOT NULL,
+    location_id bigint NOT NULL,
+    role character varying DEFAULT 'venue'::character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: event_locations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.event_locations_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: event_locations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.event_locations_id_seq OWNED BY public.event_locations.id;
 
 
 --
@@ -88,7 +135,14 @@ CREATE TABLE public.events (
     external_source character varying,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    popularity_score double precision,
+    impact_score double precision,
+    confidence double precision,
+    source_url text,
+    event_year integer,
+    CONSTRAINT events_event_type_check CHECK (((event_type >= 0) AND (event_type <= 20))),
+    CONSTRAINT events_visibility_check CHECK (((visibility)::text = ANY ((ARRAY['public'::character varying, 'friends'::character varying, 'private'::character varying])::text[])))
 );
 
 
@@ -109,6 +163,43 @@ CREATE SEQUENCE public.events_id_seq
 --
 
 ALTER SEQUENCE public.events_id_seq OWNED BY public.events.id;
+
+
+--
+-- Name: ingests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ingests (
+    id bigint NOT NULL,
+    source character varying NOT NULL,
+    external_id character varying,
+    topic character varying,
+    payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    status character varying DEFAULT 'pending'::character varying NOT NULL,
+    error_message text,
+    event_id bigint,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: ingests_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ingests_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ingests_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ingests_id_seq OWNED BY public.ingests.id;
 
 
 --
@@ -166,7 +257,7 @@ CREATE TABLE public.schema_migrations (
 CREATE TABLE public.tags (
     id bigint NOT NULL,
     name character varying NOT NULL,
-    type character varying NOT NULL,
+    tag_type character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
@@ -201,7 +292,6 @@ CREATE TABLE public.users (
     name character varying,
     password_digest character varying,
     birth_location character varying,
-    string character varying,
     current_location character varying,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
@@ -234,6 +324,13 @@ ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
 
 
 --
+-- Name: event_locations id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_locations ALTER COLUMN id SET DEFAULT nextval('public.event_locations_id_seq'::regclass);
+
+
+--
 -- Name: event_tags id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -245,6 +342,13 @@ ALTER TABLE ONLY public.event_tags ALTER COLUMN id SET DEFAULT nextval('public.e
 --
 
 ALTER TABLE ONLY public.events ALTER COLUMN id SET DEFAULT nextval('public.events_id_seq'::regclass);
+
+
+--
+-- Name: ingests id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ingests ALTER COLUMN id SET DEFAULT nextval('public.ingests_id_seq'::regclass);
 
 
 --
@@ -277,6 +381,14 @@ ALTER TABLE ONLY public.ar_internal_metadata
 
 
 --
+-- Name: event_locations event_locations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_locations
+    ADD CONSTRAINT event_locations_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: event_tags event_tags_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -290,6 +402,14 @@ ALTER TABLE ONLY public.event_tags
 
 ALTER TABLE ONLY public.events
     ADD CONSTRAINT events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ingests ingests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ingests
+    ADD CONSTRAINT ingests_pkey PRIMARY KEY (id);
 
 
 --
@@ -325,6 +445,62 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: idx_event_locations_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_event_locations_unique ON public.event_locations USING btree (event_id, location_id, role);
+
+
+--
+-- Name: idx_events_metadata_gin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_events_metadata_gin ON public.events USING gin (metadata);
+
+
+--
+-- Name: idx_events_title_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_events_title_trgm ON public.events USING gin (lower((title)::text) public.gin_trgm_ops);
+
+
+--
+-- Name: idx_events_unique_external; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_events_unique_external ON public.events USING btree (external_source, external_id) WHERE ((external_source IS NOT NULL) AND (external_id IS NOT NULL));
+
+
+--
+-- Name: idx_events_unique_natural_partial; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_events_unique_natural_partial ON public.events USING btree (title, event_date, event_type) WHERE (external_source IS NULL);
+
+
+--
+-- Name: idx_ingests_source_external; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ingests_source_external ON public.ingests USING btree (source, external_id);
+
+
+--
+-- Name: index_event_locations_on_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_event_locations_on_event_id ON public.event_locations USING btree (event_id);
+
+
+--
+-- Name: index_event_locations_on_location_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_event_locations_on_location_id ON public.event_locations USING btree (location_id);
+
+
+--
 -- Name: index_event_tags_on_event_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -346,10 +522,45 @@ CREATE INDEX index_event_tags_on_tag_id ON public.event_tags USING btree (tag_id
 
 
 --
+-- Name: index_events_on_event_date; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_events_on_event_date ON public.events USING btree (event_date);
+
+
+--
+-- Name: index_events_on_event_year; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_events_on_event_year ON public.events USING btree (event_year);
+
+
+--
 -- Name: index_events_on_submitted_by_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_events_on_submitted_by_user_id ON public.events USING btree (submitted_by_user_id);
+
+
+--
+-- Name: index_ingests_on_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_ingests_on_event_id ON public.ingests USING btree (event_id);
+
+
+--
+-- Name: index_ingests_on_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_ingests_on_status ON public.ingests USING btree (status);
+
+
+--
+-- Name: index_ingests_on_topic; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_ingests_on_topic ON public.ingests USING btree (topic);
 
 
 --
@@ -388,10 +599,10 @@ CREATE INDEX index_locations_on_parent_id ON public.locations USING btree (paren
 
 
 --
--- Name: index_tags_on_name_and_type; Type: INDEX; Schema: public; Owner: -
+-- Name: index_tags_on_name_and_tag_type; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX index_tags_on_name_and_type ON public.tags USING btree (name, type);
+CREATE UNIQUE INDEX index_tags_on_name_and_tag_type ON public.tags USING btree (name, tag_type);
 
 
 --
@@ -425,6 +636,22 @@ ALTER TABLE ONLY public.locations
 
 
 --
+-- Name: ingests fk_rails_5e529921ca; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ingests
+    ADD CONSTRAINT fk_rails_5e529921ca FOREIGN KEY (event_id) REFERENCES public.events(id);
+
+
+--
+-- Name: event_locations fk_rails_7c5d68f3b5; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_locations
+    ADD CONSTRAINT fk_rails_7c5d68f3b5 FOREIGN KEY (event_id) REFERENCES public.events(id);
+
+
+--
 -- Name: event_tags fk_rails_a640508117; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -441,12 +668,26 @@ ALTER TABLE ONLY public.events
 
 
 --
+-- Name: event_locations fk_rails_ffe3309346; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_locations
+    ADD CONSTRAINT fk_rails_ffe3309346 FOREIGN KEY (location_id) REFERENCES public.locations(id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20250809124437'),
+('20250809124357'),
+('20250809124323'),
+('20250809124234'),
+('20250809124133'),
+('20250724184249'),
 ('20250724170652'),
 ('20250724164454'),
 ('20250724164017'),
