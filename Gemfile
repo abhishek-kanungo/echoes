@@ -27,6 +27,8 @@ gem "bcrypt"
 gem 'omniauth-google-oauth2'
 
 
+# Gemfile
+gem 'sidekiq'
 
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false

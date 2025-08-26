@@ -54,6 +54,43 @@ CREATE TABLE public.ar_internal_metadata (
 
 
 --
+-- Name: crawl_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.crawl_runs (
+    id bigint NOT NULL,
+    source character varying NOT NULL,
+    topic character varying NOT NULL,
+    year integer NOT NULL,
+    current_page integer DEFAULT 0 NOT NULL,
+    total_pages integer,
+    status character varying DEFAULT 'running'::character varying NOT NULL,
+    last_error text,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: crawl_runs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.crawl_runs_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: crawl_runs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.crawl_runs_id_seq OWNED BY public.crawl_runs.id;
+
+
+--
 -- Name: event_locations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -84,6 +121,40 @@ CREATE SEQUENCE public.event_locations_id_seq
 --
 
 ALTER SEQUENCE public.event_locations_id_seq OWNED BY public.event_locations.id;
+
+
+--
+-- Name: event_media; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.event_media (
+    id bigint NOT NULL,
+    event_id bigint NOT NULL,
+    media_asset_id bigint NOT NULL,
+    role character varying DEFAULT 'gallery'::character varying NOT NULL,
+    "position" integer DEFAULT 0 NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: event_media_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.event_media_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: event_media_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.event_media_id_seq OWNED BY public.event_media.id;
 
 
 --
@@ -242,6 +313,50 @@ ALTER SEQUENCE public.locations_id_seq OWNED BY public.locations.id;
 
 
 --
+-- Name: media_assets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.media_assets (
+    id bigint NOT NULL,
+    provider character varying NOT NULL,
+    external_id character varying,
+    media_type character varying NOT NULL,
+    subtype character varying,
+    url character varying NOT NULL,
+    preview_url character varying,
+    mime character varying,
+    width integer,
+    height integer,
+    aspect_ratio double precision,
+    language character varying,
+    vote_count integer,
+    vote_average double precision,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: media_assets_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.media_assets_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: media_assets_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.media_assets_id_seq OWNED BY public.media_assets.id;
+
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -324,10 +439,24 @@ ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
 
 
 --
+-- Name: crawl_runs id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.crawl_runs ALTER COLUMN id SET DEFAULT nextval('public.crawl_runs_id_seq'::regclass);
+
+
+--
 -- Name: event_locations id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.event_locations ALTER COLUMN id SET DEFAULT nextval('public.event_locations_id_seq'::regclass);
+
+
+--
+-- Name: event_media id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_media ALTER COLUMN id SET DEFAULT nextval('public.event_media_id_seq'::regclass);
 
 
 --
@@ -359,6 +488,13 @@ ALTER TABLE ONLY public.locations ALTER COLUMN id SET DEFAULT nextval('public.lo
 
 
 --
+-- Name: media_assets id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.media_assets ALTER COLUMN id SET DEFAULT nextval('public.media_assets_id_seq'::regclass);
+
+
+--
 -- Name: tags id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -381,11 +517,27 @@ ALTER TABLE ONLY public.ar_internal_metadata
 
 
 --
+-- Name: crawl_runs crawl_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.crawl_runs
+    ADD CONSTRAINT crawl_runs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: event_locations event_locations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.event_locations
     ADD CONSTRAINT event_locations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: event_media event_media_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_media
+    ADD CONSTRAINT event_media_pkey PRIMARY KEY (id);
 
 
 --
@@ -418,6 +570,14 @@ ALTER TABLE ONLY public.ingests
 
 ALTER TABLE ONLY public.locations
     ADD CONSTRAINT locations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: media_assets media_assets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.media_assets
+    ADD CONSTRAINT media_assets_pkey PRIMARY KEY (id);
 
 
 --
@@ -466,13 +626,6 @@ CREATE INDEX idx_events_title_trgm ON public.events USING gin (lower((title)::te
 
 
 --
--- Name: idx_events_unique_external; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_events_unique_external ON public.events USING btree (external_source, external_id) WHERE ((external_source IS NOT NULL) AND (external_id IS NOT NULL));
-
-
---
 -- Name: idx_events_unique_natural_partial; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -487,6 +640,34 @@ CREATE INDEX idx_ingests_source_external ON public.ingests USING btree (source, 
 
 
 --
+-- Name: idx_ingests_source_external_topic; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_ingests_source_external_topic ON public.ingests USING btree (source, external_id, topic);
+
+
+--
+-- Name: idx_ingests_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_ingests_unique ON public.ingests USING btree (source, external_id, topic);
+
+
+--
+-- Name: idx_media_provider_external; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_media_provider_external ON public.media_assets USING btree (provider, external_id, subtype);
+
+
+--
+-- Name: index_crawl_runs_on_source_and_topic_and_year; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_crawl_runs_on_source_and_topic_and_year ON public.crawl_runs USING btree (source, topic, year);
+
+
+--
 -- Name: index_event_locations_on_event_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -498,6 +679,34 @@ CREATE INDEX index_event_locations_on_event_id ON public.event_locations USING b
 --
 
 CREATE INDEX index_event_locations_on_location_id ON public.event_locations USING btree (location_id);
+
+
+--
+-- Name: index_event_media_on_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_event_media_on_event_id ON public.event_media USING btree (event_id);
+
+
+--
+-- Name: index_event_media_on_event_id_and_media_asset_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_event_media_on_event_id_and_media_asset_id ON public.event_media USING btree (event_id, media_asset_id);
+
+
+--
+-- Name: index_event_media_on_event_id_and_role_and_position; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_event_media_on_event_id_and_role_and_position ON public.event_media USING btree (event_id, role, "position");
+
+
+--
+-- Name: index_event_media_on_media_asset_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_event_media_on_media_asset_id ON public.event_media USING btree (media_asset_id);
 
 
 --
@@ -620,6 +829,14 @@ CREATE UNIQUE INDEX index_users_on_google_uid ON public.users USING btree (googl
 
 
 --
+-- Name: event_media fk_rails_24589e3112; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_media
+    ADD CONSTRAINT fk_rails_24589e3112 FOREIGN KEY (event_id) REFERENCES public.events(id);
+
+
+--
 -- Name: event_tags fk_rails_2692903801; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -641,6 +858,14 @@ ALTER TABLE ONLY public.locations
 
 ALTER TABLE ONLY public.ingests
     ADD CONSTRAINT fk_rails_5e529921ca FOREIGN KEY (event_id) REFERENCES public.events(id);
+
+
+--
+-- Name: event_media fk_rails_6bab3503d6; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_media
+    ADD CONSTRAINT fk_rails_6bab3503d6 FOREIGN KEY (media_asset_id) REFERENCES public.media_assets(id);
 
 
 --
@@ -682,6 +907,10 @@ ALTER TABLE ONLY public.event_locations
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20250811'),
+('20250810120000'),
+('20250809150010'),
+('20250809150000'),
 ('20250809124437'),
 ('20250809124357'),
 ('20250809124323'),

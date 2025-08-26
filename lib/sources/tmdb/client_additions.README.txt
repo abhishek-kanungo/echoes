@@ -1,0 +1,13 @@
+Add these methods to lib/sources/tmdb/client.rb:
+
+  def movie_images(id, include_image_language: "en,null")
+    @http.get("movie/#{id}/images", { include_image_language: include_image_language })
+  end
+
+  def movie_videos(id)
+    @http.get("movie/#{id}/videos")
+  end
+
+Ensure BASE ends with a trailing slash and HttpClient builds URLs without dropping segments:
+  BASE = "https://api.themoviedb.org/3/"
+  @http.get("discover/movie", params)

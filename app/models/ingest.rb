@@ -8,7 +8,7 @@ class Ingest < ApplicationRecord
     upserted: "upserted",
     skipped: "skipped",
     error: "error"
-  }, _prefix: :status
+  }, prefix: :status
 
   validates :source, presence: true
   validates :payload, presence: true

@@ -1,0 +1,207 @@
+The user journey (post‑location onboarding)
+
+    Complete personalization (30–60 sec)
+
+    Quick picks: interests (Movies, Music, TV, Tech, History, Politics, Internet culture).
+
+    Optional: import contacts / find friends (phone/email/social).
+
+    Result: we can rank events by generation + proximity + interests.
+
+    Land on the Home timeline
+
+    Two tabs: Now/Upcoming and Past (Nostalgia).
+
+    Each card = one event (movie release, TV premiere, political milestone, etc.) tuned to:
+
+        Where they lived in that year (high weight)
+
+        Their age at the time (generation affinity)
+
+        Global resonance (popularity score)
+
+    Primary actions on a card:
+
+        Echo (share a memory)
+
+        React (❤️ 😂 😮 😢 🔥)
+
+        Comment
+
+        Save (to a personal “Time Capsule”)
+
+        Share (deep link)
+
+    Create a memory (Echo)
+
+    Tap Echo → lightweight composer:
+
+        Text (what you remember, where you were)
+
+        Media: add photo/video/YouTube link
+
+        Emotional tags: “first time”, “family”, “friends”, “school”, “heartbreak”, etc.
+
+        Privacy: Only me / Friends / Community
+
+    Post instantly; the event’s memory thread updates in real time.
+
+    Event detail page
+
+    Hero (cover/backdrop/trailer if applicable)
+
+    Facts (date, place, people, synopsis/summary)
+
+    Your memory first, then Friends’ memories, then Community memories (ranked).
+
+    “Echo Chain” ribbon (short, viral-style thread of linked memories).
+
+    Related events (same city or same year you lived there).
+
+    Social graph & interactions
+
+    Follow/Friend users from memory cards.
+
+    DM from memory → “Remember when…?” starter templates.
+
+    Mentions (@friend) and soft invites (“Add your memory”).
+
+    Discovery beyond the feed
+
+    Map view: pan timeline by place; heatmap of high-memory-density events.
+
+    Year scrubbing: a slider that locks to user’s age that year (cute touch: shows their school/college years).
+
+    Search: event titles, people, hashtags, places, years.
+
+    Collections: “India 90s TV”, “2000s Internet Moments”, “Elections & Protests”.
+
+    Re‑engagement
+
+    “On this day” flashbacks tied to their locations.
+
+    Weekly prompts (“First film you watched in Chennai?”, “Where were you during the 2011 World Cup final?”).
+
+    Friend activity digest: “3 friends echoed 2007 today”.
+
+    Safety & control
+
+    Memory privacy per‑post + bulk controls.
+
+    Location privacy: show city/state/year granularity toggles.
+
+    Reporting/moderation on memories and comments.
+
+Screens to implement (Web, iOS, Android)
+
+    Auth → Location‑History Wizard → Interest Picks → Find Friends
+
+    Home (tabs: Now/Upcoming, Past)
+
+    Event Detail
+
+    Echo Composer
+
+    User Profile (Memories, Years, Places)
+
+    Map & Year Scrubber
+
+    Search
+
+    Inbox/DMs
+
+    Settings/Privacy
+
+Ranking formula (simple, effective)
+
+score = w1location_match + w2generation_affinity + w3interest_overlap + w4global_popularity + w5*friend_activity_boost
+
+    location_match: 1.0 if event place == user city for that year, falls back to state/country.
+
+    generation_affinity: Gaussian by user age at event date (peaks at 10–25).
+
+    friend_activity_boost: if friends echoed/reacted recently.
+
+Data model notes (you already have most of this)
+
+    Event (event_type, title, date, location_id, metadata, popularity_score, visibility)
+
+    Echo (user_id, event_id, text, media, emotion_tags[], privacy)
+
+    Friendship (user_id, friend_id)
+
+    Reaction (user_id, echo_id, kind)
+
+    Comment (user_id, echo_id, text)
+
+    Location (country/state/city hierarchy)
+
+    UserLocationYear (user_id, year, location_id) ← drives personalization
+
+API sketch (Rails)
+
+    GET /feed?tab=past|now&page=…
+
+        uses UserLocationYear + interests to rank events
+
+    GET /events/:id
+
+    POST /events/:id/echoes
+
+    POST /echoes/:id/reactions
+
+    POST /echoes/:id/comments
+
+    GET /discover?near=city_id&year=YYYY
+
+    GET /map?bbox=…&year=…
+
+    GET /search?q=…
+
+    GET /prompts/today
+
+Real‑time & notifications
+
+    ActionCable (or Pusher) channels: event:ID (new echoes, comments), user:ID (friend activity).
+
+    Push notifications: weekly prompts + friend engagement.
+
+React(‑Native) implementation notes (trainer hat on 🎓)
+
+State/query:
+
+    Use React Query (TanStack) for server cache (feeds, event detail, search).
+
+    Use Zustand or Redux Toolkit for ephemeral UI state (composer, filters).
+
+Navigation:
+
+    Mobile: React Navigation (stack for Auth, tabs for Home/Discover/Profile, modals for Composer).
+
+    Web: React Router with nested routes (/e/:id, /u/:id, /map, /search).
+
+Offline & perf:
+
+    Pre‑fetch event details for the first 10 cards in the feed.
+
+    Image CDN with width params; lazy load videos.
+
+    Infinite scroll with windowing (react-native/Libraries/Lists + react-window on web).
+
+Accessibility & polish:
+
+    Big tap targets, caption prompts, alt text for images, safe color contrast.
+
+    Haptics on post/like (mobile), subtle motion on card focus.
+
+What to build next (bite‑sized tasks)
+
+    Location‑aware feed endpoint + simple ranker (as above).
+
+    Event card + Echo composer (text + photo + privacy).
+
+    Event detail with memory thread and reactions.
+
+    Discover: Map + Year Scrubber MVP.
+
+    Weekly prompt job + push.
