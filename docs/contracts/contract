@@ -1,0 +1,115 @@
+# Frontend-Informed Schema Proposal (MVP Foundation)
+
+> This is a practical MVP schema foundation inferred from product docs + current frontend. Not final production modeling.
+
+## Design goals
+1. Support event-first memory loop end-to-end.
+2. Include privacy/moderation primitives from docs now.
+3. Keep social graph minimal (friend-lite/mutual).
+
+---
+## User
+- **Purpose**: account + identity for contribution/personalization.
+- **Core fields**: `id`, `handle`, `display_name`, `email/phone auth refs`, `dob`, `current_location_id`, `created_at`, `status`.
+- **Relationships**: has many `UserInterest`, `UserLocationPeriod`, `Echo`, `Comment`, `Reaction`, `SavedItem`, `Notification`.
+- **Frontend-required**: handle, DOB, city, interests.
+- **Docs-required**: real-name vs handle visibility controls.
+- **Can wait**: rich profile media.
+- **Privacy/lifecycle**: account deactivation and legal deletion policies needed.
+
+## UserInterest
+- **Purpose**: personalization input.
+- **Core fields**: `id`, `user_id`, `interest_key`, `weight`, `source` (onboarding/implicit).
+- **Relationships**: belongs to user.
+- **Frontend-required**: interest tags selected on guest/onboarding.
+- **Can wait**: dynamic weighting model.
+
+## UserLocationPeriod
+- **Purpose**: age+place relevance scoring over time.
+- **Core fields**: `id`, `user_id`, `location_id`, `start_date`, `end_date`, `confidence`.
+- **Docs-required**: location history collected after first nostalgia hit.
+- **Can wait**: fine-grained neighborhood history.
+- **Privacy**: sensitive; user-editable and minimally exposed.
+
+## Location
+- **Purpose**: normalized geography reference.
+- **Core fields**: `id`, `country_code`, `region`, `city`, `display_name`, `lat`, `lng`, `scope`.
+- **Relationships**: referenced by events and user location periods.
+- **Frontend-required**: city display.
+
+## Event
+- **Purpose**: primary discovery object.
+- **Core fields**:
+  - identity: `id`, `slug`, `title`, `short_title`, `category`, `subcategory`
+  - timing/place: `event_date`, `date_precision`, `location_id`, `status`
+  - narrative: `summary`, `description`, `significance`
+  - ranking: `popularity_score`, `nostalgia_score`, `relevance_boosts`
+  - trust: `moderation_status`, `sensitivity_tier`, `is_featured`
+- **Relationships**: has many `EventAsset`, `Echo`; many-to-many self for related events.
+- **Frontend-required**: title/category/date/place/media/summary/counts/timeline support.
+- **Can wait**: advanced editorial analytics.
+
+## EventAsset
+- **Purpose**: media and supporting visuals.
+- **Core fields**: `id`, `event_id`, `asset_type` (hero_image, gallery_image, hero_video), `url`, `alt_text`, `source_credit`, `sort_order`.
+- **Frontend-required**: hero image + optional video + gallery images.
+- **Can wait**: derivatives/transcoding metadata.
+
+## Echo
+- **Purpose**: user memory post tied to event.
+- **Core fields**: `id`, `event_id`, `user_id`, `text`, `privacy`, `city_location_id?`, `relative_location_text?`, `first_experienced_month?`, `edited_at?`, `deleted_at?`.
+- **Relationships**: has many `Comment`, `Reaction`; optional attachments via assets.
+- **Frontend-required**: text/location/companions/first experienced/reaction counts.
+- **Docs-required**: one-echo-per-event-per-user unique constraint `(event_id,user_id,deleted_at IS NULL)`.
+- **Lifecycle/privacy**: privacy transition history + deleted/private placeholder behavior.
+
+## Comment
+- **Purpose**: social discussion on echoes.
+- **Core fields**: `id`, `echo_id`, `user_id`, `parent_comment_id?`, `body`, `depth`, `created_at`, `deleted_at`.
+- **Docs-required**: max depth 2.
+- **Can wait**: rich text/media comments.
+
+## Reaction
+- **Purpose**: lightweight emotional response.
+- **Core fields**: `id`, `target_type` (echo/comment), `target_id`, `user_id`, `reaction_type`, `created_at`.
+- **Docs-required**: 5 reaction types enum.
+- **Frontend-required**: reaction counts on event/echo cards.
+
+## SavedEvent / Time Capsule Item
+- **Purpose**: private archival save of event or echo.
+- **Core fields**: `id`, `user_id`, `item_type` (`event|echo`), `item_id`, `visibility` (default private), `created_at`, `shared_token_id?`.
+- **Frontend-required**: saved counts and capsule listing.
+
+## Prompt
+- **Purpose**: return-trigger memory nudges.
+- **Core fields**: `id`, `prompt_type`, `text`, `event_id?`, `targeting_rules`, `status`, `scheduled_at`, `expires_at`.
+- **Docs-required**: frequency cap support and types (on-this-day, where-were-you, friend-activity).
+- **Can wait**: fully automated trend pipeline.
+
+## Notification
+- **Purpose**: user-facing activity/prompt delivery.
+- **Core fields**: `id`, `user_id`, `kind`, `title`, `body`, `action_url`, `is_read`, `priority`, `created_at`.
+- **Relationships**: can reference prompt/friend-request/echo/comment.
+- **Docs-required**: pinned prompt/friend-request handling (ordering metadata).
+
+## ModerationReport
+- **Purpose**: trust/safety intake.
+- **Core fields**: `id`, `reporter_user_id`, `target_type`, `target_id`, `reason`, `details`, `status`, `reviewed_by`, `created_at`, `resolved_at`.
+- **Docs-required**: moderation baseline before scale.
+
+## Friend-lite / Mutual
+- **Purpose**: minimal social layer without full social network complexity.
+- **Core fields**:
+  - `FriendRequest`: `id`, `from_user_id`, `to_user_id`, `note?`, `status`, `created_at`
+  - `Mutual`: `id`, `user_a_id`, `user_b_id`, `created_at`, `source` (contacts/manual)
+- **Docs-required**: mutual visibility behavior.
+- **Can wait**: deep graph features.
+
+---
+## Cross-cutting recommendations
+1. Add denormalized counters with async recompute pipeline (`echo_count`, `comment_count`, etc.).
+2. Keep audit trail for privacy changes and moderation decisions.
+3. Maintain soft-delete records for doc-specified placeholder behavior.
+
+## Assumptions log
+- DMs entity intentionally omitted from base schema due MVP-scope tension; can be layered later without breaking core model.
